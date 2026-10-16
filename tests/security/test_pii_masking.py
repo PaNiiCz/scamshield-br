@@ -1,6 +1,6 @@
 import pytest
 
-from tests.security.pii_masking import mascarar_com_contagem, mascarar_pii
+from backend.security.pii_masking import mascarar_com_contagem, mascarar_pii
 
 
 def test_mascara_cpf_formatado():
