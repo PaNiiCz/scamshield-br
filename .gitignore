@@ -1,0 +1,22 @@
+# Ambiente virtual
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Segredos
+.env
+
+# Banco local e modelos treinados
+*.db
+*.sqlite3
+models/*.joblib
+
+# Front-end (usaremos depois)
+node_modules/
+dist/
+
+# Editor
+.vscode/
