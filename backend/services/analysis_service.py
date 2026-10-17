@@ -3,21 +3,29 @@
 Recebe a mensagem, chama os analisadores adequados, entrega os sinais
 ao motor de risco e monta o resultado final.
 
-Hoje só existe o analisador de regras. Nas próximas etapas, os demais
-analisadores (URL, ML, e-mail, OSINT...) entram na lista de sinais aqui.
+Analisadores ativos: regras (Etapa 3) e URLs (Etapa 5). Nas próximas
+etapas, os demais (ML, e-mail, OSINT...) entram na lista de sinais aqui.
 """
 
 from backend.analyzers.rules import analisar_regras
+from backend.analyzers.scam_types import NOMES_AMIGAVEIS, classificar_tipo
+from backend.analyzers.url_analyzer import analisar_urls
 from backend.core.models import (
     MensagemEntrada,
     NivelRisco,
     ResultadoAnalise,
     Sinal,
+    TipoGolpe,
 )
 from backend.risk.risk_engine import calcular_risco
 
 
-def _montar_resumo(nivel: NivelRisco, qtd_sinais: int, motivo: str | None) -> str:
+def _montar_resumo(
+    nivel: NivelRisco,
+    qtd_sinais: int,
+    motivo: str | None,
+    tipo: TipoGolpe | None,
+) -> str:
     sinais = "sinal" if qtd_sinais == 1 else "sinais"
 
     if nivel == NivelRisco.VERDE:
@@ -38,6 +46,8 @@ def _montar_resumo(nivel: NivelRisco, qtd_sinais: int, motivo: str | None) -> st
             "Confirme pelo canal oficial da empresa."
         )
 
+    if tipo in NOMES_AMIGAVEIS:
+        resumo += f" Tipo provável: {NOMES_AMIGAVEIS[tipo]}."
     if motivo:
         resumo += f" Nível mínimo aplicado por regra de segurança: {motivo}."
     return resumo
@@ -47,18 +57,25 @@ def analisar_mensagem(mensagem: MensagemEntrada) -> ResultadoAnalise:
     """Analisa uma mensagem e devolve o resultado explicável."""
     sinais: list[Sinal] = []
 
-    # Hoje: apenas as regras manuais. (Etapas futuras adicionam mais aqui.)
     sinais.extend(analisar_regras(mensagem.texto))
+    sinais.extend(analisar_urls(mensagem.texto))
 
     # Sinais mais pesados primeiro: o usuário vê o que mais importa no topo.
     sinais.sort(key=lambda s: s.pontos, reverse=True)
 
     veredito = calcular_risco(sinais)
 
+    # Só classificamos o tipo quando há motivo para desconfiar.
+    tipo = None
+    if veredito.nivel != NivelRisco.VERDE:
+        tipo = classificar_tipo(mensagem.texto, sinais)
+
     return ResultadoAnalise(
         pontuacao=veredito.pontuacao,
         nivel=veredito.nivel,
         sinais=sinais,
-        tipo_golpe=None,  # preenchido pelo scam_types, na Etapa 5
-        resumo=_montar_resumo(veredito.nivel, len(sinais), veredito.motivo_forcado),
+        tipo_golpe=tipo,
+        resumo=_montar_resumo(
+            veredito.nivel, len(sinais), veredito.motivo_forcado, tipo
+        ),
     )
