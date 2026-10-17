@@ -20,3 +20,7 @@ dist/
 
 # Editor
 .vscode/
+
+# Postman (configuração local da ferramenta)
+.postman/
+postman/
