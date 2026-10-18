@@ -39,3 +39,14 @@ def test_sinais_vem_ordenados_do_mais_pesado_ao_mais_leve():
 def test_resumo_do_verde_nao_afirma_certeza():
     r = analisar_mensagem(MensagemEntrada(texto="Bom dia!"))
     assert "não garante" in r.resumo
+
+def test_nenhum_sinal_aparece_duplicado():
+    textos = [
+        "Parabéns! Você ganhou um prêmio. Resgate em https://bit.ly/premio123",
+        "CLARO: sua fatura está em atraso e sua linha será bloqueada hoje! "
+        "Pague via PIX imediatamente: http://claro-fatura.xyz",
+    ]
+    for texto in textos:
+        resultado = analisar_mensagem(MensagemEntrada(texto=texto))
+        codigos = [sinal.codigo for sinal in resultado.sinais]
+        assert len(codigos) == len(set(codigos))

@@ -3,8 +3,9 @@
 Recebe a mensagem, chama os analisadores adequados, entrega os sinais
 ao motor de risco e monta o resultado final.
 
-Analisadores ativos: regras (Etapa 3) e URLs (Etapa 5). Nas próximas
-etapas, os demais (ML, e-mail, OSINT...) entram na lista de sinais aqui.
+Analisadores ativos: regras (Etapa 3), URLs (Etapa 5) e modelo de texto
+(Etapa 6). Nas próximas etapas, os demais (e-mail, OSINT...) entram na
+lista de sinais aqui.
 """
 
 from backend.analyzers.rules import analisar_regras
@@ -58,9 +59,7 @@ def analisar_mensagem(mensagem: MensagemEntrada) -> ResultadoAnalise:
     """Analisa uma mensagem e devolve o resultado explicável."""
     sinais: list[Sinal] = []
 
-    sinais.extend(analisar_regras(mensagem.texto))
-    sinais.extend(analisar_urls(mensagem.texto))
-
+    # Cada analisador é chamado UMA vez.
     sinais.extend(analisar_regras(mensagem.texto))
     sinais.extend(analisar_urls(mensagem.texto))
     sinais.extend(analisar_ml(mensagem.texto))
