@@ -24,3 +24,6 @@ dist/
 # Postman (configuração local da ferramenta)
 .postman/
 postman/
+
+# Dataset sintético (regenerável com scripts/gerar_dados_sinteticos.py)
+data/synthetic/*.csv

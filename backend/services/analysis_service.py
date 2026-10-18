@@ -9,6 +9,7 @@ etapas, os demais (ML, e-mail, OSINT...) entram na lista de sinais aqui.
 
 from backend.analyzers.rules import analisar_regras
 from backend.analyzers.scam_types import NOMES_AMIGAVEIS, classificar_tipo
+from backend.analyzers.text_classifier import analisar_ml
 from backend.analyzers.url_analyzer import analisar_urls
 from backend.core.models import (
     MensagemEntrada,
@@ -59,6 +60,10 @@ def analisar_mensagem(mensagem: MensagemEntrada) -> ResultadoAnalise:
 
     sinais.extend(analisar_regras(mensagem.texto))
     sinais.extend(analisar_urls(mensagem.texto))
+
+    sinais.extend(analisar_regras(mensagem.texto))
+    sinais.extend(analisar_urls(mensagem.texto))
+    sinais.extend(analisar_ml(mensagem.texto))
 
     # Sinais mais pesados primeiro: o usuário vê o que mais importa no topo.
     sinais.sort(key=lambda s: s.pontos, reverse=True)

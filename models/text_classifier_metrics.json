@@ -1,0 +1,19 @@
+{
+  "aviso": "Métricas em dados SINTÉTICOS (otimistas). Avaliação real: Fase 2.",
+  "mensagens_treino": 2000,
+  "mensagens_teste": 556,
+  "observacao": "metricas medidas sem os modelos de teste; o modelo salvo usa todos os dados",
+  "golpe": {
+    "precision": 1.0,
+    "recall": 0.9833333333333333,
+    "f1-score": 0.9915966386554622,
+    "support": 240.0
+  },
+  "legitima": {
+    "precision": 0.9875,
+    "recall": 1.0,
+    "f1-score": 0.9937106918238994,
+    "support": 316.0
+  },
+  "acuracia": 0.9928057553956835
+}
