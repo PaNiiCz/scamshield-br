@@ -3,16 +3,18 @@
 Recebe a mensagem, chama os analisadores adequados, entrega os sinais
 ao motor de risco e monta o resultado final.
 
-Analisadores ativos: regras (Etapa 3), URLs (Etapa 5) e modelo de texto
-(Etapa 6). Nas próximas etapas, os demais (e-mail, OSINT...) entram na
-lista de sinais aqui.
+Analisadores ativos: regras (Etapa 3), URLs (Etapa 5), modelo de texto
+(Etapa 6) e cabeçalhos de e-mail (Etapa 7, só no canal e-mail). Nas
+próximas etapas, os demais (OSINT...) entram na lista de sinais aqui.
 """
 
+from backend.analyzers.email_header_analyzer import analisar_cabecalhos
 from backend.analyzers.rules import analisar_regras
 from backend.analyzers.scam_types import NOMES_AMIGAVEIS, classificar_tipo
 from backend.analyzers.text_classifier import analisar_ml
 from backend.analyzers.url_analyzer import analisar_urls
 from backend.core.models import (
+    Canal,
     MensagemEntrada,
     NivelRisco,
     ResultadoAnalise,
@@ -63,6 +65,11 @@ def analisar_mensagem(mensagem: MensagemEntrada) -> ResultadoAnalise:
     sinais.extend(analisar_regras(mensagem.texto))
     sinais.extend(analisar_urls(mensagem.texto))
     sinais.extend(analisar_ml(mensagem.texto))
+
+    # Cabeçalhos só fazem sentido para e-mail. O corpo do e-mail já passou
+    # pelos três analisadores acima.
+    if mensagem.canal == Canal.EMAIL and mensagem.cabecalhos_email:
+        sinais.extend(analisar_cabecalhos(mensagem.cabecalhos_email))
 
     # Sinais mais pesados primeiro: o usuário vê o que mais importa no topo.
     sinais.sort(key=lambda s: s.pontos, reverse=True)

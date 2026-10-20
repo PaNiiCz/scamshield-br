@@ -61,7 +61,7 @@ class MensagemEntrada(BaseModel):
     texto: str = Field(min_length=1, max_length=10_000)
     canal: Canal = Canal.WHATSAPP
     # Só usado quando o canal é e-mail: cabeçalhos brutos da mensagem
-    cabecalhos_email: str | None = None
+    cabecalhos_email: str | None = Field(default=None, max_length=20_000)
 
 
 class ResultadoAnalise(BaseModel):

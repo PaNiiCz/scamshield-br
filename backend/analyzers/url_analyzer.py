@@ -133,11 +133,12 @@ def extrair_urls(texto: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Análise de uma URL
+# Funções públicas de apoio (usadas também pelo analisador de e-mail)
 # ---------------------------------------------------------------------------
 
 
-def _e_oficial(host: str) -> bool:
+def e_oficial(host: str) -> bool:
+    """True se o endereço é (ou é subdomínio de) um domínio oficial conhecido."""
     return any(
         host == dominio or host.endswith("." + dominio)
         for marca in MARCAS
@@ -151,7 +152,8 @@ def _variantes(host: str) -> set[str]:
     return {host, base.replace("1", "l"), base.replace("1", "i")}
 
 
-def _marca_imitada(host: str) -> Marca | None:
+def marca_imitada(host: str) -> Marca | None:
+    """Marca cujo nome aparece no endereço. Não confere se o host é oficial."""
     for variante in _variantes(host):
         compacto = variante.replace("-", "")
         pedacos = set(re.split(r"[.\-]", variante))
@@ -165,12 +167,36 @@ def _marca_imitada(host: str) -> Marca | None:
     return None
 
 
+def dominio_registrado(host: str) -> str:
+    """Parte "registrada" do endereço: mail.loja.com.br -> loja.com.br."""
+    extraido = _EXTRATOR(host)
+    if extraido.suffix:
+        return f"{extraido.domain}.{extraido.suffix}"
+    return extraido.domain
+
+
+def tem_punycode(host: str) -> bool:
+    """True se algum pedaço do endereço usa a codificação xn--."""
+    return any(rotulo.startswith("xn--") for rotulo in host.split("."))
+
+
+def tem_tld_suspeito(host: str) -> bool:
+    """True se o final do endereço (.xyz, .top...) é muito usado em golpes."""
+    sufixo = _EXTRATOR(host).suffix
+    return bool(sufixo) and sufixo.rsplit(".", 1)[-1] in TLDS_SUSPEITOS
+
+
 def _e_ip(host: str) -> bool:
     try:
         ipaddress.ip_address(host)
         return True
     except ValueError:
         return False
+
+
+# ---------------------------------------------------------------------------
+# Análise de uma URL
+# ---------------------------------------------------------------------------
 
 
 def analisar_url(url: str) -> list[Sinal]:
@@ -184,7 +210,7 @@ def analisar_url(url: str) -> list[Sinal]:
 
     # Endereço oficial conhecido: não gera sinal (evita acusar o site verdadeiro).
     # Exceção: o truque do "@", em que o host real é outro.
-    if _e_oficial(host) and not parse.username:
+    if e_oficial(host) and not parse.username:
         return []
 
     sinais: list[Sinal] = []
@@ -224,7 +250,7 @@ def analisar_url(url: str) -> list[Sinal]:
         f"{extraido.domain}.{extraido.suffix}" if extraido.suffix else extraido.domain
     )
 
-    if any(rotulo.startswith("xn--") for rotulo in host.split(".")):
+    if tem_punycode(host):
         adicionar(
             "dominio_punycode",
             f"O endereço '{host}' usa codificação especial (xn--), "
@@ -264,7 +290,7 @@ def analisar_url(url: str) -> list[Sinal]:
             10,
         )
 
-    marca = _marca_imitada(host)
+    marca = marca_imitada(host)
     if marca:
         oficiais = ", ".join(marca.dominios_oficiais)
         adicionar(
