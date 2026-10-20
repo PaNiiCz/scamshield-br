@@ -42,7 +42,52 @@ class Regra:
     pontos: int
     padroes: tuple[str, ...]  # escritos SEM acento, em minúsculas
     forte: bool = False
+    # Trechos "inofensivos" que são apagados do texto ANTES de aplicar
+    # `padroes` (ex: avisos como "não compartilhe seu código").
+    ignorar: tuple[str, ...] = ()
+    # Padrões de PEDIDO direto ("informe o código"). Valem sempre, mesmo
+    # que o texto tenha um aviso: golpista também escreve "não compartilhe".
+    padroes_diretos: tuple[str, ...] = ()
 
+
+# ---------------------------------------------------------------------------
+# Apoio da regra pedido_dados_sensiveis (Etapa 7.5)
+# ---------------------------------------------------------------------------
+
+# "Resto da frase": vai até o fim da frase, mas PARA em "mas/porém/...".
+# Assim "não compartilhe com ninguém, mas informe o código" não apaga o
+# pedido que vem depois do "mas".
+_RESTO = r"(?:(?!\b(?:mas|porem|entretanto|contudo)\b)[^.!?;])*"
+
+# Avisos de segurança: o texto está ALERTANDO, não pedindo.
+_AVISOS_DE_SEGURANCA = (
+    r"\b(?:nao|nunca|jamais) (?:compartilhe|compartilhar|informe|informar|"
+    r"envie|enviar|passe|passar|forneca|fornecer|digite|digitar|fale|falar|"
+    r"diga|dizer|repasse|repassar|mostre|divulgue|divulgar)\b" + _RESTO,
+    r"\b(?:nao|nunca|jamais) (?:pedimos|solicitamos|pede|pedem|solicita|"
+    r"solicitam|pediremos|solicitaremos|ligamos|enviamos)\b" + _RESTO,
+    r"\bnenhum(?:a)?(?: \w+){1,4} (?:pedira|solicitara|ira pedir|vai pedir|"
+    r"ira solicitar|vai solicitar)\b" + _RESTO,
+    r"\bevite (?:compartilhar|informar|enviar|passar)\b" + _RESTO,
+    r"\b(?:se|caso) (?:alguem|qualquer pessoa)\b[^.!?;]*?"
+    r"\b(?:pedir|solicitar|pedirem|solicitarem|ligar)\b" + _RESTO,
+)
+
+# Mensagem que ENTREGA um código ("seu código é 123456"): o código está
+# sendo enviado para você, ninguém está pedindo nada.
+_ENTREGA_DE_CODIGO = (
+    r"\b(?:codigo|token)(?: de (?:verificacao|seguranca|confirmacao|acesso))?"
+    r"\s*(?:e|eh|:|-)?\s*\d{4,8}\b",
+    r"\b\d{4,8}\s+(?:e|eh)\s+(?:o )?(?:seu )?(?:codigo|token)"
+    r"(?: de (?:verificacao|seguranca|confirmacao|acesso))?",
+)
+
+# Pedido direto: "passa/envie/informe/mande ... código". Não vale quando
+# vem logo depois de "não/nunca/jamais/nem" ("não informe o código").
+_PEDIDO_DIRETO_DE_CODIGO = (
+    r"(?<!\bnao )(?<!\bnunca )(?<!\bjamais )(?<!\bnem )"
+    r"\b(?:passa|envie|informe|mande)\b.{0,25}\bcodigo\b",
+)
 
 REGRAS: tuple[Regra, ...] = (
     Regra(
@@ -106,12 +151,13 @@ REGRAS: tuple[Regra, ...] = (
             r"\btoken\b",
             r"\bcodigo (?:de )?(?:verificacao|seguranca|confirmacao|sms)\b",
             r"\bcodigo que (?:voce )?(?:recebeu|chegou|enviamos)\b",
-            r"\b(?:passa|envie|informe|mande)\b.{0,25}\bcodigo\b",
             r"\bdados (?:do )?(?:cartao|bancarios)\b",
             r"\bnumero do cartao\b",
             r"\bfoto (?:do |de )?(?:documento|rg|cnh)\b",
             r"\bselfie\b",
         ),
+        ignorar=_AVISOS_DE_SEGURANCA + _ENTREGA_DE_CODIGO,
+        padroes_diretos=_PEDIDO_DIRETO_DE_CODIGO,
     ),
     Regra(
         codigo="falso_parente",
@@ -217,6 +263,19 @@ REGRAS: tuple[Regra, ...] = (
 _COMPILADAS: dict[str, list[re.Pattern[str]]] = {
     regra.codigo: [re.compile(p) for p in regra.padroes] for regra in REGRAS
 }
+_COMPILADAS_DIRETAS: dict[str, list[re.Pattern[str]]] = {
+    regra.codigo: [re.compile(p) for p in regra.padroes_diretos] for regra in REGRAS
+}
+_COMPILADAS_IGNORAR: dict[str, list[re.Pattern[str]]] = {
+    regra.codigo: [re.compile(p) for p in regra.ignorar] for regra in REGRAS
+}
+
+
+def _sem_trechos_inofensivos(codigo: str, texto: str) -> str:
+    """Apaga do texto os trechos que a regra deve ignorar (avisos etc.)."""
+    for padrao in _COMPILADAS_IGNORAR[codigo]:
+        texto = padrao.sub(" ", texto)
+    return texto
 
 
 def analisar_regras(texto: str) -> list[Sinal]:
@@ -228,7 +287,11 @@ def analisar_regras(texto: str) -> list[Sinal]:
     normalizado = normalizar(texto)
     sinais: list[Sinal] = []
     for regra in REGRAS:
-        if any(p.search(normalizado) for p in _COMPILADAS[regra.codigo]):
+        limpo = _sem_trechos_inofensivos(regra.codigo, normalizado)
+        achou = any(p.search(limpo) for p in _COMPILADAS[regra.codigo]) or any(
+            p.search(normalizado) for p in _COMPILADAS_DIRETAS[regra.codigo]
+        )
+        if achou:
             sinais.append(
                 Sinal(
                     codigo=regra.codigo,
