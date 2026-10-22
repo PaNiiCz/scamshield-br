@@ -4,12 +4,13 @@ Recebe a mensagem, chama os analisadores adequados, entrega os sinais
 ao motor de risco e monta o resultado final.
 
 Analisadores ativos: regras (Etapa 3), URLs (Etapa 5), modelo de texto
-(Etapa 6), cabeçalhos de e-mail (Etapa 7, só no canal e-mail) e OSINT
-passivo (Etapa 8). Nas próximas etapas, os demais entram na lista de
-sinais aqui.
+(Etapa 6), cabeçalhos de e-mail (Etapa 7, só no canal e-mail), OSINT
+passivo (Etapa 8) e letras falsas (Etapa 8.5). Nas próximas etapas, os
+demais entram na lista de sinais aqui.
 """
 
 from backend.analyzers.email_header_analyzer import analisar_cabecalhos
+from backend.analyzers.homoglyph_analyzer import analisar_homoglifos, desfazer_confusiveis
 from backend.analyzers.rules import analisar_regras
 from backend.analyzers.scam_types import NOMES_AMIGAVEIS, classificar_tipo
 from backend.analyzers.text_classifier import analisar_ml
@@ -63,17 +64,25 @@ def analisar_mensagem(mensagem: MensagemEntrada) -> ResultadoAnalise:
     """Analisa uma mensagem e devolve o resultado explicável."""
     sinais: list[Sinal] = []
 
+    # Letras de outros alfabetos que imitam letras latinas ("а" cirílico = 1072,
+    # "a" latino = 97) são trocadas pelas latinas ANTES das regras, do modelo e
+    # do analisador de URLs. Assim "рix" volta a ser "pix" e "clаro-fatura.xyz"
+    # volta a imitar a Claro. O texto ORIGINAL segue para o analisador de
+    # letras falsas e para o OSINT (que precisa do endereço verdadeiro).
+    texto_limpo = desfazer_confusiveis(mensagem.texto)
+
     # Cada analisador é chamado UMA vez.
-    sinais.extend(analisar_regras(mensagem.texto))
-    sinais.extend(analisar_urls(mensagem.texto))
-    sinais.extend(analisar_ml(mensagem.texto))
+    sinais.extend(analisar_regras(texto_limpo))
+    sinais.extend(analisar_urls(texto_limpo))
+    sinais.extend(analisar_ml(texto_limpo))
+    sinais.extend(analisar_homoglifos(mensagem.texto))
 
     # OSINT passivo (Etapa 8): consulta só o DOMÍNIO dos links a fontes
     # públicas. Se estiver desligado ou as fontes falharem, devolve [].
     sinais.extend(analisar_osint(mensagem.texto))
 
     # Cabeçalhos só fazem sentido para e-mail. O corpo do e-mail já passou
-    # pelos três analisadores acima.
+    # pelos analisadores acima.
     if mensagem.canal == Canal.EMAIL and mensagem.cabecalhos_email:
         sinais.extend(analisar_cabecalhos(mensagem.cabecalhos_email))
 
@@ -85,7 +94,7 @@ def analisar_mensagem(mensagem: MensagemEntrada) -> ResultadoAnalise:
     # Só classificamos o tipo quando há motivo para desconfiar.
     tipo = None
     if veredito.nivel != NivelRisco.VERDE:
-        tipo = classificar_tipo(mensagem.texto, sinais)
+        tipo = classificar_tipo(texto_limpo, sinais)
 
     return ResultadoAnalise(
         pontuacao=veredito.pontuacao,
