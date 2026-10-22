@@ -26,6 +26,15 @@ class Settings(BaseSettings):
     # --- Limite de tamanho da mensagem analisada (proteção contra abuso) ---
     tamanho_maximo_mensagem: int = 10_000
 
+    # --- OSINT passivo (Etapa 8) ---
+    # Consulta fontes públicas (RDAP, Archive.org) sobre o DOMÍNIO dos links.
+    # Só o domínio sai da sua máquina, nunca o texto da mensagem. Mesmo assim,
+    # quem recebe a consulta fica sabendo qual domínio foi pesquisado, por
+    # isso dá para desligar com OSINT_ATIVADO=false no arquivo .env.
+    osint_ativado: bool = True
+    osint_timeout_segundos: float = 5.0
+    osint_max_dominios: int = 3
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

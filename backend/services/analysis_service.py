@@ -4,8 +4,9 @@ Recebe a mensagem, chama os analisadores adequados, entrega os sinais
 ao motor de risco e monta o resultado final.
 
 Analisadores ativos: regras (Etapa 3), URLs (Etapa 5), modelo de texto
-(Etapa 6) e cabeçalhos de e-mail (Etapa 7, só no canal e-mail). Nas
-próximas etapas, os demais (OSINT...) entram na lista de sinais aqui.
+(Etapa 6), cabeçalhos de e-mail (Etapa 7, só no canal e-mail) e OSINT
+passivo (Etapa 8). Nas próximas etapas, os demais entram na lista de
+sinais aqui.
 """
 
 from backend.analyzers.email_header_analyzer import analisar_cabecalhos
@@ -21,6 +22,7 @@ from backend.core.models import (
     Sinal,
     TipoGolpe,
 )
+from backend.osint.osint_service import analisar_osint
 from backend.risk.risk_engine import calcular_risco
 
 
@@ -65,6 +67,10 @@ def analisar_mensagem(mensagem: MensagemEntrada) -> ResultadoAnalise:
     sinais.extend(analisar_regras(mensagem.texto))
     sinais.extend(analisar_urls(mensagem.texto))
     sinais.extend(analisar_ml(mensagem.texto))
+
+    # OSINT passivo (Etapa 8): consulta só o DOMÍNIO dos links a fontes
+    # públicas. Se estiver desligado ou as fontes falharem, devolve [].
+    sinais.extend(analisar_osint(mensagem.texto))
 
     # Cabeçalhos só fazem sentido para e-mail. O corpo do e-mail já passou
     # pelos três analisadores acima.
