@@ -5,8 +5,8 @@ ao motor de risco e monta o resultado final.
 
 Analisadores ativos: regras (Etapa 3), URLs (Etapa 5), modelo de texto
 (Etapa 6), cabeçalhos de e-mail (Etapa 7, só no canal e-mail), OSINT
-passivo (Etapa 8) e letras falsas (Etapa 8.5). Nas próximas etapas, os
-demais entram na lista de sinais aqui.
+passivo (Etapa 8), letras falsas (Etapa 8.5) e VirusTotal (Etapa 9).
+Nas próximas etapas, os demais entram na lista de sinais aqui.
 """
 
 from backend.analyzers.email_header_analyzer import analisar_cabecalhos
@@ -25,6 +25,7 @@ from backend.core.models import (
 )
 from backend.osint.osint_service import analisar_osint
 from backend.risk.risk_engine import calcular_risco
+from backend.threat_intel.virustotal_client import analisar_virustotal
 
 
 def _montar_resumo(
@@ -80,6 +81,9 @@ def analisar_mensagem(mensagem: MensagemEntrada) -> ResultadoAnalise:
     # OSINT passivo (Etapa 8): consulta só o DOMÍNIO dos links a fontes
     # públicas. Se estiver desligado ou as fontes falharem, devolve [].
     sinais.extend(analisar_osint(mensagem.texto))
+
+    # VirusTotal (Etapa 9): só com chave no .env. Pergunta só pelo DOMÍNIO.
+    sinais.extend(analisar_virustotal(mensagem.texto))
 
     # Cabeçalhos só fazem sentido para e-mail. O corpo do e-mail já passou
     # pelos analisadores acima.

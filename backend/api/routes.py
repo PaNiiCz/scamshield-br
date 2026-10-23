@@ -2,10 +2,12 @@
 
 from fastapi import APIRouter
 
+from backend.api.routes_arquivo import router as router_arquivo
 from backend.core.models import MensagemEntrada, ResultadoAnalise
 from backend.services.analysis_service import analisar_mensagem
 
 router = APIRouter()
+router.include_router(router_arquivo)
 
 
 @router.get("/saude")
